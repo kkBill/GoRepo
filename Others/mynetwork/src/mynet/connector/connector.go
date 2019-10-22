@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -29,7 +30,7 @@ func (c *Connector) Send(data DataBlock) error {
 	// 设置头部
 	byteBuf := make([]byte, len(byteArray)+4)                     // +4 是为了存放该条数据的数据长度
 	// 这个函数不太懂
-	binary.BigEndian.PutUint32(byteBuf[:4], uint32(len(byteBuf))) // 前4个字节存放数据长度
+	binary.BigEndian.PutUint32(byteBuf[:4], uint32(len(byteArray))) // 前4个字节存放数据长度  // bug出在这里！！错写成uint32(len(byteBuf)了
 	copy(byteBuf[4:], byteArray)                                  // 拷贝有效数据
 	// 向 conn 中写入数据
 	_, err = c.conn.Write(byteBuf)
@@ -46,7 +47,9 @@ func (c *Connector) Receive() (DataBlock, error) {
 	header := make([]byte, 4)
 	// func ReadFull(r Reader, buf []byte) (n int, err error)
 	// ReadFull 从 r 精确地读取 len(buf) 字节数据填充进 buf
-	_, err := io.ReadFull(c.conn, header)
+	n, err := io.ReadFull(c.conn, header)
+	fmt.Println("server after ReadFull() header bytes: ", n)
+
 	if err != nil {
 		log.Printf("read header data error: %v\n", err)
 		return DataBlock{}, err
@@ -54,8 +57,11 @@ func (c *Connector) Receive() (DataBlock, error) {
 
 	// 将头部字节序列转化成数值
 	dataLen := binary.BigEndian.Uint32(header)
+	fmt.Println("dataLen: ", dataLen)
 	dataBuf := make([]byte, dataLen)
-	_, err = io.ReadFull(c.conn, dataBuf)
+	n, err = io.ReadFull(c.conn, dataBuf) // 卡在了这里
+	fmt.Println("server after ReadFull() real data bytes: ", n)
+
 	if err != nil {
 		log.Printf("read real data error: %v\n", err)
 		return DataBlock{}, err
